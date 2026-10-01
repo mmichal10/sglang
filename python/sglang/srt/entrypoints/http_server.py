@@ -1960,6 +1960,28 @@ async def vertex_generate(vertex_req: VertexGenerateReqInput, raw_request: Reque
     return ORJSONResponse({"predictions": ret})
 
 
+@app.api_route("/radix_tree", methods=["GET", "POST"])
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def radix_tree_json():
+    ret = await _global_state.tokenizer_manager.radix_tree_json()
+
+    return Response(
+            content=f"{ret.radix_tree}",
+            status_code=200 if ret.success else HTTPStatus.BAD_REQUEST,
+            )
+
+
+@app.api_route("/trim_cache", methods=["GET", "POST"])
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def radix_tree_json():
+    ret = await _global_state.tokenizer_manager.trim_cache()
+
+    return Response(
+            content=f"Cache trimmed (tokens: {ret.trimmed})",
+            status_code=200 if ret.success else HTTPStatus.BAD_REQUEST,
+            )
+
+
 def _create_error_response(e):
     return ORJSONResponse(
         {"error": {"message": str(e)}}, status_code=HTTPStatus.BAD_REQUEST

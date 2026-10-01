@@ -29,6 +29,10 @@ from sglang.srt.managers.io_struct import (
     ExpertDistributionReq,
     ExpertDistributionReqOutput,
     ExpertDistributionReqType,
+    RadixTreeJsonReqInput,
+    RadixTreeJsonReqOutput,
+    TrimCacheReqInput,
+    TrimCacheReqOutput,
     FlushCacheReqInput,
     FlushCacheReqOutput,
     GetInternalStateReq,
@@ -102,6 +106,8 @@ _COMMUNICATOR_SPECS = [
     ("check_weights", CheckWeightsReqOutput),
     ("slow_down", SlowDownReqOutput),
     ("flush_cache", FlushCacheReqOutput),
+    ("trim_cache", TrimCacheReqOutput),
+    ("radix_tree_json", RadixTreeJsonReqOutput),
     ("add_external_corpus", AddExternalCorpusReqOutput),
     ("remove_external_corpus", RemoveExternalCorpusReqOutput),
     ("list_external_corpora", ListExternalCorporaReqOutput),
@@ -133,6 +139,14 @@ class TokenizerControlMixin:
             setattr(self, f"{name}_communicator", comm)
             dispatch_pairs.append((resp_type, comm.handle_recv))
         self._result_dispatcher += TypeBasedDispatcher(dispatch_pairs)
+
+    async def radix_tree_json(self: TokenizerManager) -> RadixTreeJsonReqOutput:
+        self.auto_create_handle_loop()
+        return (await self.radix_tree_json_communicator(RadixTreeJsonReqInput()))[0]
+
+    async def trim_cache(self: TokenizerManager) -> TrimCacheReqOutput:
+        self.auto_create_handle_loop()
+        return (await self.trim_cache_communicator(TrimCacheReqInput()))[0]
 
     async def add_external_corpus(
         self: TokenizerManager, obj: AddExternalCorpusReqInput

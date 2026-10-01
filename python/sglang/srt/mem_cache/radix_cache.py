@@ -757,6 +757,34 @@ class RadixCache(KVCacheEventMixin, BasePrefixCache):
             self._record_store_event(new_node)
         return total_prefix_length
 
+    def get_json(self):
+        """Return the trree in JSON format"""
+
+        return self._get_json_helper(self.root_node)
+
+    def _get_json_helper(self, node):
+        if len(node.key.token_ids) >= 10:
+            token_begin = list(node.key.token_ids)[:10]
+            token_end = list(node.key.token_ids)[-10:]
+        else:
+            token_begin = None
+            token_end = None
+
+        return {
+                "id": node.id,
+                "length": len(node.key.token_ids),
+                "tokens_begin": token_begin,
+                "tokens_end": token_end,
+                "lock_ref": node.lock_ref,
+                "evicted": node.evicted,
+                "backuped": node.backuped,
+                "hit_count": node.hit_count,
+                "children": [
+                    self._get_json_helper(c)
+                    for c in node.children.values()
+                ],
+            }
+
     def _print_helper(self, node: TreeNode, indent: int):
         """Prints the radix tree in a human-readable format."""
         stack = [(node, indent)]

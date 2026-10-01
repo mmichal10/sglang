@@ -1297,6 +1297,28 @@ class BatchEmbeddingOutput(BaseBatchReq):
 
 
 @dataclass
+class RadixTreeJsonReqInput(BaseReq):
+    pass
+
+
+@dataclass
+class RadixTreeJsonReqOutput(BaseReq):
+    success: bool
+    radix_tree: str
+
+
+@dataclass
+class TrimCacheReqInput(BaseReq):
+    pass
+
+
+@dataclass
+class TrimCacheReqOutput(BaseReq):
+    success: bool
+    trimmed: int
+
+
+@dataclass
 class ClearHiCacheReqInput(BaseReq):
     pass
 

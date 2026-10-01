@@ -107,6 +107,10 @@ from sglang.srt.managers.io_struct import (
     ExpertDistributionReqOutput,
     ExpertDistributionReqType,
     FlushCacheReqInput,
+    RadixTreeJsonReqInput,
+    RadixTreeJsonReqOutput,
+    TrimCacheReqInput,
+    TrimCacheReqOutput,
     FreezeGCReq,
     GetInternalStateReq,
     GetInternalStateReqOutput,
@@ -1327,6 +1331,8 @@ class Scheduler(
                 (BatchTokenizedGenerateReqInput, self.handle_batch_generate_request),
                 (BatchTokenizedEmbeddingReqInput, self.handle_batch_embedding_request),
                 (FlushCacheReqInput, self.flush_wrapper.handle),
+                (RadixTreeJsonReqInput, self.radix_cache_wrapped),
+                (TrimCacheReqInput, self.trim_cache_wrapped),
                 (ClearHiCacheReqInput, self.clear_hicache_storage_wrapped),
                 (AttachHiCacheStorageReqInput, self.attach_hicache_storage_wrapped),
                 (DetachHiCacheStorageReqInput, self.detach_hicache_storage_wrapped),
@@ -3346,6 +3352,19 @@ class Scheduler(
             )
         return self.external_corpus_manager.list(recv_req)
 
+    def radix_cache_wrapped(self, recv_req: RadixTreeJsonReqInput):
+        success = True
+        try:
+            radix_json = self.get_radix_cache_json()
+        except:
+            success = False
+            radix_json = "ERROR"
+        return RadixTreeJsonReqOutput(success=success, radix_tree=radix_json)
+
+    def trim_cache_wrapped(self, recv_req: TrimCacheReqInput):
+        success, trimmed = self.trim_cache()
+        return TrimCacheReqOutput(success=success, trimmed=trimmed)
+
     def clear_hicache_storage_wrapped(self, recv_req: ClearHiCacheReqInput):
         if self.enable_hierarchical_cache:
             self.tree_cache.clear_storage_backend()
@@ -3546,6 +3565,25 @@ class Scheduler(
             )
 
         return DetachHiCacheStorageReqOutput(success=False, message=msg)
+
+    def get_radix_cache_json(self):
+        return self.tree_cache.get_json()
+
+    def trim_cache(self):
+        success = False
+        trimmed = 0
+        if self.is_fully_idle():
+            trimmed = self.tree_cache.trim()
+            success = True
+        else:
+            logging.warning(
+                    f"Cache not trimmed because there are pending requests. "
+                    f"#queue-req: {len(self.waiting_queue)}, "
+                    f"#running-req: {len(self.running_batch.reqs)}"
+            )
+            success = False
+
+        return success, trimmed
 
     def flush_cache(self, empty_cache: bool = True):
         """Flush memory pools (e.g., KV cache, Mamba cache) and optionally empty device allocator cache."""

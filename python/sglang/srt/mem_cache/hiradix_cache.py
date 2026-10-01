@@ -1085,6 +1085,61 @@ class HiRadixCache(RadixCache):
         if node not in self.evictable_host_leaves:
             self.evictable_host_leaves.add(node)
 
+    def trim(self) -> int:
+        self.writing_check()
+
+        start_time = time.perf_counter()
+        leaves = list(self.evictable_leaves)
+        eviction_heap = [
+            (self.eviction_strategy.get_priority(node), node) for node in leaves
+        ]
+        heapq.heapify(eviction_heap)
+
+        num_evicted = 0
+        write_back_nodes = []
+        logger.debug(f"{len(leaves)} trim candidates")
+
+        while True:
+            try:
+                _, x = heapq.heappop(eviction_heap)
+            except:
+                break
+
+
+            if x.lock_ref > 0:
+                continue
+
+            if not x.backuped:
+                if self.cache_controller.write_policy == "write_back":
+                    # write to host if the node is not backuped
+                    written = self.write_backup(x, write_back=True)
+                    num_evicted += written
+                    write_back_nodes.append(x)
+                else:
+                    num_evicted += self._evict_regular(x)
+            else:
+                num_evicted += self._evict_backuped(x)
+
+            for child in x.parent.children.values():
+                if not child.evicted:
+                    break
+            else:
+                # all children are evicted or no children
+                new_priority = self.eviction_strategy.get_priority(x.parent)
+                heapq.heappush(eviction_heap, (new_priority, x.parent))
+
+        if self.cache_controller.write_policy == "write_back":
+            self.writing_check(write_back=True)
+            for node in write_back_nodes:
+                assert node.backuped
+                self._evict_backuped(node)
+
+        logger.debug(f"Trimmed {num_evicted} tokens")
+
+        self.update_eviction_metrics(num_evicted, start_time)
+
+        return num_evicted
+
     def evict(self, params: EvictParams) -> EvictResult:
         start_time = time.perf_counter()
         num_tokens = params.num_tokens
@@ -1783,6 +1838,9 @@ class HiRadixCache(RadixCache):
 
             if self.cache_controller.write_policy != "write_back":
                 self._inc_hit_count(new_node, chunked)
+
+        self.writing_check()
+
         return InsertResult(prefix_len=total_prefix_length)
 
     def release_aborted_request(self, rid: str):
